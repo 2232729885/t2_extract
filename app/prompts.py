@@ -146,4 +146,7 @@ operation, funding, or command relationship.
 - `resolvedAuthorAccountId`: if you can confidently resolve the content's author to a known account ID,
   return it; otherwise return null - the backend has its own fallback for this, it is not mandatory.
 - Do not fabricate entities or relations that are not actually supported by the text.
+- Extract at most 20 entities and at most 20 relations per request, even if the text mentions more -
+  prioritize the most important/central ones to the content. This keeps the output a bounded size and
+  avoids the response being cut off mid-generation on entity-dense text.
 """
