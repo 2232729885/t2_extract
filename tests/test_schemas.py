@@ -178,3 +178,22 @@ def test_llm_client_limits_concurrent_requests(monkeypatch):
             t.join()
 
         assert max_concurrent[0] <= 2
+
+
+def test_422_validation_errors_are_logged_with_detail(caplog):
+    """
+    FastAPI默认422只把detail塞进响应体，不打印到容器日志。这里验证自定义的
+    validation_exception_handler确实把详细的校验错误和原始请求体打进了日志。
+    """
+    import logging
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    with caplog.at_level(logging.ERROR):
+        resp = client.post("/extract_entities", json={"text": 123})
+
+    assert resp.status_code == 422
+    assert any("422 Unprocessable Entity" in record.message for record in caplog.records)
