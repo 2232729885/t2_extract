@@ -81,6 +81,38 @@ def test_allowed_predicates_has_exactly_16():
     assert "AFFILIATED_WITH" not in ALLOWED_PREDICATES  # 已废弃的旧关系名，不应该在词表内
 
 
+def test_annotation_field_accepts_list_not_just_dict():
+    """
+    2026-07-14生产环境真实422错误：T1的entitiesHint本来就是数组（一条内容可能对应多个
+    实体线索），之前把annotation字段类型定死成dict，后端真实传过来的是list时直接校验失败。
+    """
+    request = ExtractRequest.model_validate(
+        {
+            "text": "CATL is a battery manufacturer",
+            "annotation": [
+                {
+                    "text": "CATL",
+                    "typeHint": "organizations",
+                    "evidenceIds": ["ev_001"],
+                    "entityHintId": "ent_001",
+                    "entityHintConfidence": 0.95,
+                },
+                {
+                    "text": "CYATY",
+                    "typeHint": "organizations",
+                    "evidenceIds": ["ev_001"],
+                    "entityHintId": "ent_002",
+                    "entityHintConfidence": 0.9,
+                },
+            ],
+            "context": {"contentId": "abc123"},
+            "language": "en",
+        }
+    )
+    assert isinstance(request.annotation, list)
+    assert len(request.annotation) == 2
+
+
 def test_null_list_fields_are_treated_as_empty():
     """
     Java DTO 的 List<X> 字段没有值时，Jackson 序列化出来是显式的 null，不是省略key也不是[]。

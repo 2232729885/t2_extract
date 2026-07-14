@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from app.schemas.common import CamelModel
 
@@ -75,7 +75,10 @@ class Context(CamelModel):
 class ExtractRequest(CamelModel):
     title: Optional[str] = None
     text: str
-    annotation: Optional[dict] = None
+    # T1 entitiesHint 本来就是数组（一条内容可能对应多个实体线索），不是单个对象，
+    # 这个字段只是参考用、直接拼进提示词文本，不需要对内部结构做强校验，用 Any 兼容
+    # list/dict 等各种实际可能传过来的形状，不要定死成 dict
+    annotation: Optional[Any] = None
     context: Optional[Context] = None
     language: Optional[str] = None
 
