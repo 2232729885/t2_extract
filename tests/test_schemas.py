@@ -79,3 +79,27 @@ def test_allowed_predicates_has_exactly_16():
     assert len(ALLOWED_PREDICATES) == 16
     assert "SUPPORTS" in ALLOWED_PREDICATES
     assert "AFFILIATED_WITH" not in ALLOWED_PREDICATES  # 已废弃的旧关系名，不应该在词表内
+
+
+def test_null_list_fields_are_treated_as_empty():
+    """
+    Java DTO 的 List<X> 字段没有值时，Jackson 序列化出来是显式的 null，不是省略key也不是[]。
+    context.hashtags/mentions 显式传 null 时应该被当成空列表处理，不能校验失败
+    （这是2026-07-14生产环境真实报过的一个422错误，t1_annotation项目同样的问题，这里同步补测试）。
+    """
+    request = ExtractRequest.model_validate(
+        {
+            "title": None,
+            "text": "some text",
+            "annotation": None,
+            "context": {
+                "contentId": "abc123",
+                "platform": "reddit",
+                "hashtags": None,
+                "mentions": None,
+            },
+            "language": "en",
+        }
+    )
+    assert request.context.hashtags == []
+    assert request.context.mentions == []
