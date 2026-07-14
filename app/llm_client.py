@@ -5,6 +5,7 @@
 import json
 import logging
 import re
+import threading
 
 from openai import OpenAI
 
@@ -31,37 +32,47 @@ class LlmClient:
         self._max_retries = settings.llm_max_retries
         self._use_json_response_format = settings.llm_use_json_response_format
         self._disable_thinking = settings.llm_disable_thinking
+        # 用信号量控制同时转发给vLLM的请求数上限，超过的在这里排队等，
+        # 不是直接拒绝也不是无限制地并发压过去
+        self._semaphore = threading.Semaphore(settings.llm_max_concurrent_requests)
 
-    def call_json(self, system_prompt: str, user_prompt: str) -> dict:
+    def call_json(self, system_prompt: str, user_content) -> dict:
         """
         调用大模型，要求返回一个JSON对象。
+        user_content 可以是纯字符串，也可以是 OpenAI 多模态格式的 content 数组
+        （比如 [{"type": "text", "text": "..."}, {"type": "image_url", "image_url": {"url": "..."}}]），
+        由调用方决定要不要带图片——只有 annotate_service 在有图片时会传数组，其余接口都是传字符串。
         自动重试 self._max_retries 次；全部失败则抛出 LlmCallError，由上层走 fallback。
         """
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
-            try:
-                kwargs = {}
-                if self._use_json_response_format:
-                    kwargs["response_format"] = {"type": "json_object"}
-                if self._disable_thinking:
-                    # Qwen3 通过 vLLM 的 chat_template_kwargs.enable_thinking 关闭思考模式，
-                    # 走 extra_body 透传（openai SDK 官方参数里没有这个字段，vLLM是它自己的扩展）
-                    kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
-                response = self._client.chat.completions.create(
-                    model=self._model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=self._temperature,
-                    max_tokens=self._max_tokens,
-                    **kwargs,
-                )
-                raw_text = response.choices[0].message.content
-                return self._parse_json(raw_text)
-            except Exception as exc:  # noqa: BLE001 - 这里统一捕获，交给上层决定fallback
-                last_error = exc
-                logger.warning("LLM call failed (attempt %s/%s): %s", attempt + 1, self._max_retries + 1, exc)
+            # 排队等到有空位再真正发请求给vLLM，控制同时在跑的请求数上限
+            with self._semaphore:
+                try:
+                    kwargs = {}
+                    if self._use_json_response_format:
+                        kwargs["response_format"] = {"type": "json_object"}
+                    if self._disable_thinking:
+                        # Qwen3 通过 vLLM 的 chat_template_kwargs.enable_thinking 关闭思考模式，
+                        # 走 extra_body 透传（openai SDK 官方参数里没有这个字段，vLLM是它自己的扩展）
+                        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+                    response = self._client.chat.completions.create(
+                        model=self._model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content},
+                        ],
+                        temperature=self._temperature,
+                        max_tokens=self._max_tokens,
+                        **kwargs,
+                    )
+                    raw_text = response.choices[0].message.content
+                    return self._parse_json(raw_text)
+                except Exception as exc:  # noqa: BLE001 - 这里统一捕获，交给上层决定fallback
+                    last_error = exc
+                    logger.warning(
+                        "LLM call failed (attempt %s/%s): %s", attempt + 1, self._max_retries + 1, exc
+                    )
         raise LlmCallError(f"LLM调用最终失败: {last_error}") from last_error
 
     @staticmethod

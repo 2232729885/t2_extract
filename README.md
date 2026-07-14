@@ -73,6 +73,7 @@ Dockerfile
 - 大模型调用失败时返回**空的 entities/relations 数组**（`_build_fallback_response`），不是报错，让流水线可以继续往下走，只是这条内容没抽到东西。
 - **`llm_client.py` 会自动剥离 `<think>...</think>`**——Qwen3 是推理模型，vLLM 部署时如果没有关掉思考模式，返回内容前面可能带一段思考过程，这段会被自动去掉再解析JSON。
 - **`LLM_USE_JSON_RESPONSE_FORMAT`**：vLLM 是否支持 `response_format={"type":"json_object"}` 取决于具体版本和启动参数，不支持的话在 `.env` 里改成 `false`。
+- **`LLM_MAX_CONCURRENT_REQUESTS`**：T1/T2共用同一个vLLM实例，同一时刻最多有几个请求真正转发给vLLM，超过的在这边排队等，避免并发太高把vLLM压垮（2026-07-14生产事故：并发+多模态请求把GPU显存压爆导致vLLM引擎崩溃，详见t1_annotation项目README）。
 
 ## 测试
 

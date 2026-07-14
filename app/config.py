@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # 对这种schema已经写得很死的结构化抽取任务没必要，还会显著拖慢生成速度、增加超时概率，
     # 默认关掉；如果你们的 vLLM/模型版本不支持 enable_thinking 这个参数导致报错，改成 false
     llm_disable_thinking: bool = True
+    # 同一时刻最多有几个请求真正转发给vLLM，超过的排队等待，避免并发太高把vLLM压垮
+    # （尤其是多模态请求，图片视觉向量处理需要额外显存，并发一高容易把GPU显存耗尽导致vLLM整体崩溃）
+    llm_max_concurrent_requests: int = 4
 
     # 服务本身
     service_port: int = 8002
