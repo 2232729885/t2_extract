@@ -32,7 +32,7 @@ uvicorn app.main:app --reload --port 8002
 docker build -t t2-extract:latest .
 
 # .env 参照 .env.example 先建好，填真实的 LLM_BASE_URL 等
-docker run -d -p 8002:8002 --env-file .env --name t2-extract t2-extract:latest
+docker run -d -p 5000:5000 --env-file .env --name t2-extract t2-extract:latest
 
 # 如果 vLLM 部署在宿主机上（不是内网其他机器），容器内访问宿主机用 host.docker.internal
 # （Linux 上可能需要 docker run 加 --add-host=host.docker.internal:host-gateway）
@@ -42,7 +42,7 @@ docker run -d -p 8002:8002 --env-file .env --name t2-extract t2-extract:latest
 
 ```bash
 docker logs -f t2-extract
-curl http://localhost:8002/health
+curl http://localhost:5000/health
 ```
 
 ## 目录结构
