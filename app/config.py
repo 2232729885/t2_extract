@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # vLLM 是否支持 response_format={"type":"json_object"} 取决于具体版本/启动参数，
     # 不支持的话改成 false，代码会跳过这个参数，靠提示词+兜底解析来保证输出JSON
     llm_use_json_response_format: bool = True
+    # Qwen3 是混合推理模型，默认可能开着思考模式，回答前会先生成一大段思考过程再给最终JSON，
+    # 对这种schema已经写得很死的结构化抽取任务没必要，还会显著拖慢生成速度、增加超时概率，
+    # 默认关掉；如果你们的 vLLM/模型版本不支持 enable_thinking 这个参数导致报错，改成 false
+    llm_disable_thinking: bool = True
 
     # 服务本身
     service_port: int = 8002
