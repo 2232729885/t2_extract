@@ -7,10 +7,25 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# apt 源换成阿里云镜像——同时兼容新版Debian的deb822格式（/etc/apt/sources.list.d/debian.sources）
+# 和旧版格式（/etc/apt/sources.list），哪个存在就改哪个，避免因为基础镜像版本变化导致这行失效
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+            /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    if [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+            /etc/apt/sources.list; \
+    fi
+
 # 系统依赖：几乎不需要额外的系统包，openai/fastapi都是纯Python依赖，curl只是给健康检查用
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# pip 源换成阿里云镜像
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
