@@ -3,7 +3,7 @@
 # 运行：docker run -d -p 8002:8002 --env-file .env --name t2-extract t2-extract:latest
 #   （.env 参照 .env.example 填好 LLM_BASE_URL 等内网vLLM连接信息）
 
-FROM python:3.12-slim
+FROM hlyn3voy1ie4dwn74t.xuanyuan.run/python:3.12-slim
 
 WORKDIR /app
 
