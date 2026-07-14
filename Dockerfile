@@ -21,10 +21,10 @@ COPY app/ ./app/
 RUN useradd --create-home --shell /bin/bash appuser
 USER appuser
 
-EXPOSE 8002
+EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
 
 # 生产环境不用 --reload，worker数量按实际负载调整
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "2"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "2"]
