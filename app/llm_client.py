@@ -1,6 +1,6 @@
 """
-封装对通义千问（DashScope OpenAI 兼容模式）的调用。
-只负责"发提示词、拿到JSON"这一层，不关心具体是T1的哪个接口。
+封装对大模型的调用（内网 vLLM 部署的 Qwen3，OpenAI 兼容接口）。
+只负责"发提示词、拿到JSON"这一层，不关心具体是哪个业务接口。
 """
 import json
 import logging
@@ -21,14 +21,15 @@ class LlmClient:
     def __init__(self) -> None:
         settings = get_settings()
         self._client = OpenAI(
-            api_key=settings.dashscope_api_key,
-            base_url=settings.dashscope_base_url,
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
             timeout=settings.llm_timeout_seconds,
         )
-        self._model = settings.dashscope_model
+        self._model = settings.llm_model
         self._temperature = settings.llm_temperature
         self._max_tokens = settings.llm_max_tokens
         self._max_retries = settings.llm_max_retries
+        self._use_json_response_format = settings.llm_use_json_response_format
 
     def call_json(self, system_prompt: str, user_prompt: str) -> dict:
         """
@@ -38,6 +39,9 @@ class LlmClient:
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
+                kwargs = {}
+                if self._use_json_response_format:
+                    kwargs["response_format"] = {"type": "json_object"}
                 response = self._client.chat.completions.create(
                     model=self._model,
                     messages=[
@@ -46,7 +50,7 @@ class LlmClient:
                     ],
                     temperature=self._temperature,
                     max_tokens=self._max_tokens,
-                    response_format={"type": "json_object"},
+                    **kwargs,
                 )
                 raw_text = response.choices[0].message.content
                 return self._parse_json(raw_text)
@@ -61,6 +65,9 @@ class LlmClient:
             raise LlmCallError("大模型返回了空内容")
 
         text = raw_text.strip()
+
+        # Qwen3 这类推理模型有时会带 <think>...</think> 思考过程，先去掉
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
         # 有些模型即使要求了json_object，偶尔还是会带markdown代码块围栏，这里做一层兜底清理
         if text.startswith("```"):
