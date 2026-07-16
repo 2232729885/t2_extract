@@ -17,7 +17,8 @@ def _build_user_prompt(request: ExtractRequest) -> str:
     parts: list[str] = []
     if request.title:
         parts.append(f"Title: {request.title}")
-    parts.append(f"Text: {request.text}")
+    if request.text:
+        parts.append(f"Text: {request.text}")
 
     if request.annotation:
         parts.append(f"T1 annotation hints (for reference only, not authoritative): {request.annotation}")
@@ -53,7 +54,18 @@ def _build_fallback_response(request: ExtractRequest) -> ExtractResponse:
     return response
 
 
+def _has_extractable_text(request: ExtractRequest) -> bool:
+    return bool((request.title and request.title.strip()) or (request.text and request.text.strip()))
+
+
 def extract_entities(request: ExtractRequest) -> ExtractResponse:
+    if not _has_extractable_text(request):
+        logger.info(
+            "extract_entities skipped because title/text are empty, contentId=%s",
+            request.context.content_id if request.context else None,
+        )
+        return _build_fallback_response(request)
+
     try:
         raw = get_llm_client().call_json(EXTRACT_ENTITIES_SYSTEM_PROMPT, _build_user_prompt(request))
         response = ExtractResponse.model_validate(raw)

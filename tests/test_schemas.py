@@ -137,6 +137,34 @@ def test_null_list_fields_are_treated_as_empty():
     assert request.context.mentions == []
 
 
+def test_extract_entities_accepts_null_text_and_returns_empty_result():
+    """
+    Some upstream records can contain only media/URL metadata. T2 should not turn explicit
+    text=null into a 422 response because that breaks the backend pipeline retry flow.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/extract_entities",
+        json={
+            "title": None,
+            "text": None,
+            "annotation": None,
+            "context": {"contentId": "empty-text-1", "platform": "reddit"},
+            "language": "unknown",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["contentId"] == "empty-text-1"
+    assert body["entities"] == []
+    assert body["relations"] == []
+
+
 def test_llm_client_limits_concurrent_requests(monkeypatch):
     """
     T1/T2共用同一个vLLM实例，2026-07-14生产环境真实事故（并发请求太多把vLLM的GPU显存
